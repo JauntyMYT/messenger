@@ -1,0 +1,37 @@
+services:
+    jauntym.messenger.controller.main:
+        class: jauntym\messenger\controller\main_controller
+        arguments:
+            - '@controller.helper'
+            - '@template'
+            - '@user'
+            - '@language'
+            - '@request'
+            - '@auth'
+            - '@config'
+
+    jauntym.messenger.controller.ajax:
+        class: jauntym\messenger\controller\ajax_controller
+        arguments:
+            - '@config'
+            - '@dbal.conn'
+            - '@request'
+            - '@user'
+            - '@language'
+            - '@auth'
+            - '%core.table_prefix%'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    jauntym.messenger.listener:
+        class: jauntym\messenger\event\listener
+        arguments:
+            - '@controller.helper'
+            - '@template'
+            - '@user'
+            - '@dbal.conn'
+            - '@config'
+            - '@auth'
+            - '%core.table_prefix%'
+        tags:
+            - { name: event.listener }

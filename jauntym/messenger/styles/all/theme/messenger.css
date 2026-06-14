@@ -1,0 +1,60 @@
+.jauntym-mess *{box-sizing:border-box;}
+.jauntym-mess{display:flex;height:600px;max-height:78vh;border:1px solid rgba(0,0,0,.12);border-radius:10px;overflow:hidden;background:#fff;font-size:14px;line-height:1.45;color:#1c1c1c;position:relative;}
+.jauntym-mess .jauntym-side{width:270px;min-width:270px;display:flex;flex-direction:column;border-right:1px solid rgba(0,0,0,.1);background:#fafafa;}
+.jauntym-mess .jauntym-side-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;}
+.jauntym-mess .jauntym-side-top h3{margin:0;font-size:17px;font-weight:600;}
+.jauntym-mess .jauntym-newbtn{display:inline-flex;align-items:center;gap:5px;border:none;background:#534AB7;color:#fff;font-size:12px;font-weight:600;padding:6px 10px;border-radius:6px;cursor:pointer;}
+.jauntym-mess .jauntym-newbtn:hover{background:#43399f;}
+.jauntym-mess .jauntym-search{margin:0 14px 8px;}
+.jauntym-mess .jauntym-search input{width:100%;padding:7px 10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;outline:none;background:#fff;}
+.jauntym-mess .jauntym-convlist{flex:1;overflow-y:auto;}
+.jauntym-mess .jauntym-conv{display:flex;gap:10px;padding:10px 14px;cursor:pointer;border-left:3px solid transparent;}
+.jauntym-mess .jauntym-conv:hover{background:#f0eef8;}
+.jauntym-mess .jauntym-conv.jauntym-active{background:#ece9f8;border-left-color:#534AB7;}
+.jauntym-mess .jauntym-conv .jauntym-meta{min-width:0;flex:1;}
+.jauntym-mess .jauntym-conv .jauntym-row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+.jauntym-mess .jauntym-conv .jauntym-name{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.jauntym-mess .jauntym-conv .jauntym-time{font-size:11px;color:#999;white-space:nowrap;}
+.jauntym-mess .jauntym-conv .jauntym-snippet{font-size:12.5px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.jauntym-mess .jauntym-conv.jauntym-unread .jauntym-snippet{color:#333;font-weight:600;}
+.jauntym-mess .jauntym-badge{flex:none;align-self:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#534AB7;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.jauntym-mess .jauntym-av{flex:none;width:42px;height:42px;border-radius:50%;background:#ccc;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:600;color:#fff;font-size:15px;}
+.jauntym-mess .jauntym-av img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;}
+.jauntym-mess .jauntym-av.s{width:34px;height:34px;font-size:13px;}
+.jauntym-mess .jauntym-main{flex:1;display:flex;flex-direction:column;min-width:0;}
+.jauntym-mess .jauntym-head{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid rgba(0,0,0,.1);position:relative;}
+.jauntym-mess .jauntym-head .jauntym-hname{font-weight:600;font-size:15px;}
+.jauntym-mess .jauntym-head .jauntym-hsub{font-size:12px;color:#888;}
+.jauntym-mess .jauntym-head .jauntym-hsub.typing{color:#534AB7;font-style:italic;}
+.jauntym-mess .jauntym-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#bbb;margin-right:5px;vertical-align:1px;}
+.jauntym-mess .jauntym-dot.on{background:#1d9e75;}
+.jauntym-mess .jauntym-kebab{flex:none;border:none;background:transparent;font-size:18px;color:#888;cursor:pointer;padding:4px 8px;border-radius:6px;}
+.jauntym-mess .jauntym-kebab:hover{background:rgba(0,0,0,.05);}
+.jauntym-mess .jauntym-menu{position:absolute;right:12px;top:48px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:5;min-width:170px;overflow:hidden;}
+.jauntym-mess .jauntym-menu button{display:block;width:100%;text-align:left;border:none;background:transparent;padding:9px 14px;font-size:13px;cursor:pointer;color:#333;}
+.jauntym-mess .jauntym-menu button:hover{background:#f3f1fb;}
+.jauntym-mess .jauntym-menu button.danger{color:#c0392b;}
+.jauntym-mess .jauntym-thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;}
+.jauntym-mess .jauntym-loadmore{align-self:center;border:1px solid rgba(0,0,0,.15);background:#fff;border-radius:14px;font-size:12px;padding:4px 12px;cursor:pointer;color:#555;margin-bottom:4px;}
+.jauntym-mess .jauntym-line{display:flex;align-items:flex-end;gap:6px;}
+.jauntym-mess .jauntym-line.me{justify-content:flex-end;}
+.jauntym-mess .jauntym-bub{max-width:72%;padding:9px 13px;border-radius:15px;font-size:14px;word-wrap:break-word;overflow-wrap:anywhere;}
+.jauntym-mess .jauntym-bub a{text-decoration:underline;}
+.jauntym-mess .jauntym-line.them .jauntym-bub{background:#ececed;color:#1c1c1c;border-bottom-left-radius:5px;}
+.jauntym-mess .jauntym-line.me .jauntym-bub{background:#534AB7;color:#fff;border-bottom-right-radius:5px;}
+.jauntym-mess .jauntym-line.me .jauntym-bub a{color:#fff;}
+.jauntym-mess .jauntym-deleted{opacity:.7;}
+.jauntym-mess .jauntym-del{flex:none;border:none;background:transparent;color:#aaa;font-size:13px;cursor:pointer;opacity:0;transition:opacity .12s;padding:2px 4px;}
+.jauntym-mess .jauntym-line.me:hover .jauntym-del{opacity:1;}
+.jauntym-mess .jauntym-receipt{align-self:flex-end;font-size:11px;color:#999;margin-top:-2px;}
+.jauntym-mess .jauntym-compose{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid rgba(0,0,0,.1);}
+.jauntym-mess .jauntym-compose textarea{flex:1;resize:none;border:1px solid rgba(0,0,0,.15);border-radius:18px;padding:9px 14px;font-size:14px;font-family:inherit;outline:none;max-height:120px;line-height:1.4;}
+.jauntym-mess .jauntym-sendbtn{flex:none;width:38px;height:38px;border-radius:50%;border:none;background:#534AB7;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.jauntym-mess .jauntym-sendbtn:disabled{opacity:.45;cursor:default;}
+.jauntym-mess .jauntym-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:14px;text-align:center;padding:24px;}
+.jauntym-mess .jauntym-hidden{display:none !important;}
+@media (max-width:620px){
+	.jauntym-mess .jauntym-side{width:100%;min-width:0;}
+	.jauntym-mess.jauntym-show-thread .jauntym-side{display:none;}
+	.jauntym-mess:not(.jauntym-show-thread) .jauntym-main{display:none;}
+}

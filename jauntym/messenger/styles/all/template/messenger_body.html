@@ -1,0 +1,40 @@
+{% INCLUDECSS '@jauntym_messenger/messenger.css' %}
+{% INCLUDEJS '@jauntym_messenger/messenger.js' %}
+{% INCLUDE 'overall_header.html' %}
+
+<a id="jauntym-anchor"></a>
+<div class="jauntym-mess" id="jauntym-mess"
+	data-ajax="{JAUNTYM_AJAX_URL}" data-token="{JAUNTYM_TOKEN}" data-me="{JAUNTYM_CUR_USER_ID}"
+	data-poll="{JAUNTYM_POLL_MS}" data-maxlen="{JAUNTYM_MAXLEN}" data-minsearch="{JAUNTYM_MINSEARCH}" data-typing="{JAUNTYM_TYPING_ON}" data-sid="{JAUNTYM_SID}"
+	data-l-seen="{L_JAUNTYM_M_SEEN}" data-l-sent="{L_JAUNTYM_M_SENT}" data-l-online="{L_JAUNTYM_M_ONLINE}"
+	data-l-none="{L_JAUNTYM_M_NO_CONVERSATIONS}" data-l-empty="{L_JAUNTYM_M_EMPTY_THREAD}" data-l-older="{L_JAUNTYM_M_LOAD_OLDER}"
+	data-l-people="{L_JAUNTYM_M_SEARCH_PEOPLE}" data-l-typing="{L_JAUNTYM_M_TYPING}" data-l-menu="{L_JAUNTYM_M_MENU}"
+	data-l-block="{L_JAUNTYM_M_BLOCK}" data-l-unblock="{L_JAUNTYM_M_UNBLOCK}" data-l-hide="{L_JAUNTYM_M_HIDE_CONV}"
+	data-l-cdel="{L_JAUNTYM_M_CONFIRM_DELETE}" data-l-cblock="{L_JAUNTYM_M_CONFIRM_BLOCK}" data-l-del="{L_JAUNTYM_M_DELETE}"
+	data-l-generic="{L_JAUNTYM_M_ERR_GENERIC}">
+
+	<div class="jauntym-side">
+		<div class="jauntym-side-top">
+			<h3>{L_JAUNTYM_MESSENGER}</h3>
+			{% if S_JAUNTYM_CAN_DM %}<button type="button" class="jauntym-newbtn" id="jauntym-new"><i class="icon fa-pencil-square-o" aria-hidden="true"></i> {L_JAUNTYM_M_NEW_MESSAGE}</button>{% endif %}
+		</div>
+		<div class="jauntym-search">
+			<input type="text" id="jauntym-search-conv" placeholder="{L_JAUNTYM_M_SEARCH_CONVERSATIONS}" autocomplete="off">
+		</div>
+		<div class="jauntym-convlist" id="jauntym-convlist"></div>
+	</div>
+
+	<div class="jauntym-main" id="jauntym-main">
+		<div class="jauntym-empty" id="jauntym-placeholder">{L_JAUNTYM_M_PICK_CONVERSATION}</div>
+		<div class="jauntym-hidden" id="jauntym-pane" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+			<div class="jauntym-head" id="jauntym-head"></div>
+			<div class="jauntym-thread" id="jauntym-thread"></div>
+			{% if S_JAUNTYM_CAN_DM %}			<div class="jauntym-compose">
+				<textarea id="jauntym-input" rows="1" placeholder="{L_JAUNTYM_M_TYPE_MESSAGE}" maxlength="{JAUNTYM_MAXLEN}"></textarea>
+				<button type="button" class="jauntym-sendbtn" id="jauntym-send" aria-label="{L_JAUNTYM_M_SEND}"><i class="icon fa-paper-plane" aria-hidden="true"></i></button>
+			</div>{% endif %}
+		</div>
+	</div>
+</div>
+
+{% INCLUDE 'overall_footer.html' %}

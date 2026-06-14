@@ -1,0 +1,32 @@
+{% if S_JAUNTYM_MESSENGER %}
+{% INCLUDECSS '@jauntym_messenger/footer_bubble.css' %}
+{% INCLUDEJS '@jauntym_messenger/footer_bubble.js' %}
+<button type="button" class="jauntymfab" id="jauntymfab" aria-label="{L_JAUNTYM_MESSENGER}">
+	<i class="icon fa-comments" aria-hidden="true"></i>
+	<strong class="jauntymfab-badge" id="jauntymfab-badge"{% if not JAUNTYM_MESSENGER_UNREAD %} style="display:none"{% endif %}>{JAUNTYM_MESSENGER_UNREAD}</strong>
+</button>
+
+<div class="jauntymbd" id="jauntymbd" style="display:none"
+	data-ajax="{U_JAUNTYM_M_AJAX}" data-sid="{JAUNTYM_M_SID}" data-token="{JAUNTYM_M_TOKEN}"
+	data-page="{U_JAUNTYM_MESSENGER}" data-poll="{JAUNTYM_M_POLL}" data-me="{JAUNTYM_M_ME}" data-candm="{% if S_JAUNTYM_CAN_DM %}1{% else %}0{% endif %}"
+	data-l-none="{L_JAUNTYM_M_NO_CONVERSATIONS}" data-l-openfull="{L_JAUNTYM_M_OPEN_FULL}" data-l-recipient="{L_JAUNTYM_M_ERR_RECIPIENT}" data-l-dm="{L_JAUNTYM_M_DM}">
+	<div class="jauntymbd-head" id="jauntymbd-head">
+		<strong>{L_JAUNTYM_MESSENGER}</strong>
+		<span class="jauntymbd-headbtns">
+			<button type="button" id="jauntymbd-close" aria-label="{L_JAUNTYM_M_CLOSE}"><i class="icon fa-times" aria-hidden="true"></i></button>
+		</span>
+	</div>
+	{% if S_JAUNTYM_CAN_DM %}
+	<div class="jauntymbd-new">
+		<input type="text" id="jauntymbd-userq" placeholder="{L_JAUNTYM_M_SEARCH_PEOPLE}" autocomplete="off">
+	</div>
+	{% endif %}
+	<div class="jauntymbd-body" id="jauntymbd-body"></div>
+	{% if S_JAUNTYM_CAN_DM %}
+	<div class="jauntymbd-compose" id="jauntymbd-compose" style="display:none">
+		<input type="text" id="jauntymbd-input" placeholder="{L_JAUNTYM_M_TYPE_MESSAGE}" autocomplete="off">
+		<button type="button" id="jauntymbd-send" aria-label="{L_JAUNTYM_M_SEND}"><i class="icon fa-paper-plane" aria-hidden="true"></i></button>
+	</div>
+	{% endif %}
+</div>
+{% endif %}

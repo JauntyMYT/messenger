@@ -1,0 +1,7 @@
+jauntym_messenger_index:
+    path: /messenger
+    defaults: { _controller: jauntym.messenger.controller.main:index }
+
+jauntym_messenger_ajax:
+    path: /messenger/ajax
+    defaults: { _controller: jauntym.messenger.controller.ajax:handle }

@@ -1,0 +1,66 @@
+{% INCLUDE 'overall_header.html' %}
+
+<a id="maincontent"></a>
+
+<h1>{{ lang('ACP_JAUNTYM_MESSENGER_SETTINGS') }}</h1>
+
+<p>{{ lang('ACP_JAUNTYM_MESSENGER_EXPLAIN') }}</p>
+
+<form id="jauntym_messenger" method="post" action="{{ U_ACTION }}">
+
+	<fieldset>
+		<legend>{{ lang('ACP_JAUNTYM_GENERAL') }}</legend>
+
+		<dl>
+			<dt><label for="jauntym_msgr_poll">{{ lang('ACP_JAUNTYM_POLL') }}</label><br><span>{{ lang('ACP_JAUNTYM_POLL_EXPLAIN') }}</span></dt>
+			<dd><input id="jauntym_msgr_poll" type="number" min="5" max="120" name="jauntym_msgr_poll" value="{{ JAUNTYM_POLL }}"> {{ lang('ACP_JAUNTYM_SECONDS') }}</dd>
+		</dl>
+
+		<dl>
+			<dt><label for="jauntym_msgr_maxlen">{{ lang('ACP_JAUNTYM_MAXLEN') }}</label><br><span>{{ lang('ACP_JAUNTYM_MAXLEN_EXPLAIN') }}</span></dt>
+			<dd><input id="jauntym_msgr_maxlen" type="number" min="1" max="60000" name="jauntym_msgr_maxlen" value="{{ JAUNTYM_MAXLEN }}"></dd>
+		</dl>
+
+		<dl>
+			<dt><label for="jauntym_msgr_minsearch">{{ lang('ACP_JAUNTYM_MINSEARCH') }}</label><br><span>{{ lang('ACP_JAUNTYM_MINSEARCH_EXPLAIN') }}</span></dt>
+			<dd><input id="jauntym_msgr_minsearch" type="number" min="1" max="10" name="jauntym_msgr_minsearch" value="{{ JAUNTYM_MINSEARCH }}"></dd>
+		</dl>
+	</fieldset>
+
+	<fieldset>
+		<legend>{{ lang('ACP_JAUNTYM_FEATURES') }}</legend>
+
+		<dl>
+			<dt><label>{{ lang('ACP_JAUNTYM_BBCODE') }}</label><br><span>{{ lang('ACP_JAUNTYM_BBCODE_EXPLAIN') }}</span></dt>
+			<dd>
+				<label><input type="radio" name="jauntym_msgr_bbcode" value="1"{% if JAUNTYM_BBCODE %} checked{% endif %}> {{ lang('YES') }}</label>
+				<label><input type="radio" name="jauntym_msgr_bbcode" value="0"{% if not JAUNTYM_BBCODE %} checked{% endif %}> {{ lang('NO') }}</label>
+			</dd>
+		</dl>
+
+		<dl>
+			<dt><label>{{ lang('ACP_JAUNTYM_SMILIES') }}</label><br><span>{{ lang('ACP_JAUNTYM_SMILIES_EXPLAIN') }}</span></dt>
+			<dd>
+				<label><input type="radio" name="jauntym_msgr_smilies" value="1"{% if JAUNTYM_SMILIES %} checked{% endif %}> {{ lang('YES') }}</label>
+				<label><input type="radio" name="jauntym_msgr_smilies" value="0"{% if not JAUNTYM_SMILIES %} checked{% endif %}> {{ lang('NO') }}</label>
+			</dd>
+		</dl>
+
+		<dl>
+			<dt><label>{{ lang('ACP_JAUNTYM_TYPING') }}</label><br><span>{{ lang('ACP_JAUNTYM_TYPING_EXPLAIN') }}</span></dt>
+			<dd>
+				<label><input type="radio" name="jauntym_msgr_typing" value="1"{% if JAUNTYM_TYPING %} checked{% endif %}> {{ lang('YES') }}</label>
+				<label><input type="radio" name="jauntym_msgr_typing" value="0"{% if not JAUNTYM_TYPING %} checked{% endif %}> {{ lang('NO') }}</label>
+			</dd>
+		</dl>
+	</fieldset>
+
+	<fieldset class="submit-buttons">
+		<input class="button1" type="submit" id="submit" name="submit" value="{{ lang('SUBMIT') }}">
+		<input class="button2" type="reset" id="reset" name="reset" value="{{ lang('RESET') }}">
+		{{ S_FORM_TOKEN }}
+	</fieldset>
+
+</form>
+
+{% INCLUDE 'overall_footer.html' %}
