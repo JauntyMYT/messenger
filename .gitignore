@@ -16,3 +16,6 @@ composer.lock
 
 # Logs
 *.log
+
+# Internal working brief — never ship or publish this
+SKILL.md

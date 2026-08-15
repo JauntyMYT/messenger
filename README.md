@@ -10,7 +10,7 @@ phpBB's native private-message inbox.
 
 - **Compatible with:** phpBB 3.2.x and 3.3.x
 - **Requires:** PHP 7.2+
-- **License:** [GPL-2.0-only](LICENSE)
+- **License:** [GPL-2.0-only](license.txt)
 
 ## Features
 
@@ -75,4 +75,4 @@ requires a persistent server process that typical shared hosting cannot run.
 ## License
 
 This extension is free software, licensed under the
-[GNU General Public License, version 2 (GPL-2.0-only)](LICENSE).
+[GNU General Public License, version 2 (GPL-2.0-only)](license.txt).

@@ -4,6 +4,26 @@ All notable changes to JauntyM Messenger are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.6
+
+### Security
+- Every state-changing AJAX action (`send`, `start`, `typing`, `delete_message`, `block`,
+  `unblock`, `hide`) now requires a POST request carrying a valid link hash. Previously only
+  `send` verified the token, so the others could be triggered cross-site with a logged-in
+  member's session (e.g. via an `<img>` tag pointing at the AJAX route).
+- The JavaScript sends all of those actions as POST with the token attached.
+- The AJAX error handler no longer returns raw exception text to the client, which could
+  disclose SQL or filesystem paths.
+
+## 1.3.5
+
+- Added explicit integer casts to all remaining ID and timestamp values used in SQL, fully clearing the pre-validator's potential-SQL-injection warnings (no behavioural change; all values were already integers).
+
+## 1.3.4
+
+- Renamed license file to `license.txt` to meet phpBB EPV packaging requirements.
+- Added explicit integer casts on ID values used in SQL to satisfy the pre-validator (no behavioural change; values were already integers).
+
 ## [1.3.3] - 2026-06-14
 
 ### Changed

@@ -28,8 +28,13 @@
 		var h=0;for(var i=0;i<(name||'').length;i++){h=(h+name.charCodeAt(i)*7)%360;}
 		return '<span class="jauntymbd-av" style="background:hsl('+h+',42%,55%)">'+esc(initials(name))+'</span>';
 	}
+	/* actions that change state: always POST, always with the CSRF token */
+	var WRITE={send:1,start:1,typing:1,delete_message:1,block:1,unblock:1,hide:1};
+
 	function api(action,params,method){
+		params=params||{};
 		method=method||'GET';
+		if(WRITE[action]){method='POST';params.hash=TOKEN;}
 		var url=AJAX+(AJAX.indexOf('?')===-1?'?':'&')+'action='+encodeURIComponent(action);
 		if(SID){url+='&sid='+encodeURIComponent(SID);}
 		var o={method:method,headers:{'X-Requested-With':'XMLHttpRequest'},credentials:'same-origin'};
@@ -97,7 +102,7 @@
 		var t=input.value.replace(/\s+$/,'');
 		if(!t||!convId){return;}
 		sendBtn.disabled=true;
-		api('send',{text:t,hash:TOKEN,conv_id:convId},'POST').then(function(res){
+		api('send',{text:t,conv_id:convId}).then(function(res){
 			sendBtn.disabled=false;
 			if(!res||!res.ok){if(res&&res.error){alert(res.error);}return;}
 			input.value='';

@@ -42,8 +42,13 @@
 		return '<span class="'+cls+'" style="background:hsl('+hue+',42%,55%)">'+esc(initials(name))+'</span>';
 	}
 
+	/* actions that change state: always POST, always with the CSRF token */
+	var WRITE={send:1,start:1,typing:1,delete_message:1,block:1,unblock:1,hide:1};
+
 	function api(action, params, method){
+		params=params||{};
 		method=method||'GET';
+		if(WRITE[action]){ method='POST'; params.hash=TOKEN; }
 		var url=AJAX+(AJAX.indexOf('?')===-1?'?':'&')+'action='+encodeURIComponent(action);
 		if(SID){ url+='&sid='+encodeURIComponent(SID); }
 		var opts={method:method,headers:{'X-Requested-With':'XMLHttpRequest'},credentials:'same-origin'};
@@ -174,7 +179,7 @@
 	}
 	function delMessage(mid){
 		if(!confirm(LANG.cdel)){ return; }
-		api('delete_message',{msg_id:mid},'POST').then(function(res){
+		api('delete_message',{msg_id:mid}).then(function(res){
 			if(!res||!res.ok){ alert(res&&res.error?res.error:LANG.generic); return; }
 			fetchMessages(0,false); loadConversations();
 		});
@@ -194,9 +199,9 @@
 		var text=inputEl.value.replace(/\s+$/,'');
 		if(!text || (!current.convId && !current.pendingUser)){ return; }
 		sendBtn.disabled=true;
-		var params={text:text,hash:TOKEN,conv_id:current.convId||0};
+		var params={text:text,conv_id:current.convId||0};
 		if(!current.convId && current.pendingUser){ params.to_user=current.pendingUser; }
-		api('send',params,'POST').then(function(res){
+		api('send',params).then(function(res){
 			sendBtn.disabled=false;
 			if(!res||!res.ok){ alert(res&&res.error?res.error:LANG.generic); return; }
 			inputEl.value=''; autoGrow();
@@ -213,7 +218,7 @@
 		var now=Date.now();
 		if(now-lastTypingPing < 3000){ return; }
 		lastTypingPing=now;
-		api('typing',{conv_id:current.convId},'POST');
+		api('typing',{conv_id:current.convId});
 	}
 
 	/* new message / user search */

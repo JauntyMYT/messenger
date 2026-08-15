@@ -40,7 +40,13 @@ class ajax_controller
 
 	const PAGE_SIZE   = 30;
 	const TYPING_WINDOW = 8;
-	const VERSION = '1.3.3';
+	const VERSION = '1.3.6';
+
+	/**
+	 * Actions that write to the database. Each one must arrive as a POST carrying a
+	 * valid link hash, so it cannot be triggered by a cross-site request.
+	 */
+	protected static $write_actions = ['send', 'start', 'typing', 'delete_message', 'block', 'unblock', 'hide'];
 
 	public function __construct(config $config, driver_interface $db, request_interface $request, user $user, language $language, auth $auth, $table_prefix, $root_path, $php_ext)
 	{
@@ -82,7 +88,9 @@ class ajax_controller
 
 	public function handle()
 	{
-		if ($this->request->variable('action', '') === 'version')
+		$action = $this->request->variable('action', '');
+
+		if ($action === 'version')
 		{
 			return new JsonResponse(['ok' => true, 'version' => self::VERSION]);
 		}
@@ -96,11 +104,18 @@ class ajax_controller
 			return $this->error('JAUNTYM_M_ERR_NOPERM', 403);
 		}
 
+		// CSRF guard for every state-changing action: POST only, with a valid link
+		// hash read from the POST data (never from the query string).
+		if (in_array($action, self::$write_actions, true) && !$this->check_token())
+		{
+			return $this->error('JAUNTYM_M_ERR_TOKEN', 403);
+		}
+
 		$this->ensure_functions();
 
 		try
 		{
-			switch ($this->request->variable('action', ''))
+			switch ($action)
 			{
 				case 'conversations':  return $this->list_conversations();
 				case 'messages':       return $this->get_messages();
@@ -117,8 +132,24 @@ class ajax_controller
 		}
 		catch (\Throwable $e)
 		{
-			return new JsonResponse(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()], 500);
+			// Never expose the exception text (it can carry SQL or filesystem paths).
+			return $this->error('JAUNTYM_M_ERR_GENERIC', 500);
 		}
+	}
+
+	/**
+	 * True only for a POST request carrying a valid 'jauntym_messenger' link hash.
+	 */
+	protected function check_token()
+	{
+		if (strtoupper($this->request->server('REQUEST_METHOD')) !== 'POST')
+		{
+			return false;
+		}
+
+		$hash = $this->request->variable('hash', '', false, request_interface::POST);
+
+		return check_link_hash($hash, 'jauntym_messenger');
 	}
 
 	/* ----------------------------------------------------------------- *
@@ -129,7 +160,7 @@ class ajax_controller
 	{
 		$sql = 'SELECT c.conv_id, c.conv_last_time, c.conv_last_msg_id, cu.cu_unread
 			FROM ' . $this->conv_table . ' c, ' . $this->cu_table . ' cu
-			WHERE cu.user_id = ' . $this->uid . '
+			WHERE cu.user_id = ' . (int) $this->uid . '
 				AND cu.cu_hidden = 0
 				AND c.conv_id = cu.conv_id
 			ORDER BY c.conv_last_time DESC';
@@ -240,11 +271,7 @@ class ajax_controller
 
 	protected function send_message()
 	{
-		if (!check_link_hash($this->request->variable('hash', ''), 'jauntym_messenger'))
-		{
-			return $this->error('JAUNTYM_M_ERR_TOKEN', 403);
-		}
-
+		// CSRF token is verified for every write action in handle().
 		if (!$this->can_dm())
 		{
 			return $this->error('JAUNTYM_M_ERR_DM', 403);
@@ -320,18 +347,18 @@ class ajax_controller
 		$msg_id = (int) $this->db->sql_nextid();
 
 		$sql = 'UPDATE ' . $this->conv_table . '
-			SET conv_last_msg_id = ' . $msg_id . ', conv_last_time = ' . $now . '
+			SET conv_last_msg_id = ' . (int) $msg_id . ', conv_last_time = ' . (int) $now . '
 			WHERE conv_id = ' . (int) $conv_id;
 		$this->db->sql_query($sql);
 
 		$sql = 'UPDATE ' . $this->cu_table . '
 			SET cu_unread = cu_unread + 1, cu_hidden = 0
-			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . $this->uid;
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . (int) $this->uid;
 		$this->db->sql_query($sql);
 
 		$sql = 'UPDATE ' . $this->cu_table . '
-			SET cu_last_read_id = ' . $msg_id . ', cu_last_read_time = ' . $now . ', cu_unread = 0, cu_hidden = 0, cu_typing_time = 0
-			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . $this->uid;
+			SET cu_last_read_id = ' . (int) $msg_id . ', cu_last_read_time = ' . (int) $now . ', cu_unread = 0, cu_hidden = 0, cu_typing_time = 0
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 		$this->db->sql_query($sql);
 
 		return new JsonResponse([
@@ -375,7 +402,7 @@ class ajax_controller
 
 		$sql = 'UPDATE ' . $this->cu_table . '
 			SET cu_hidden = 0
-			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . $this->uid;
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 		$this->db->sql_query($sql);
 
 		return new JsonResponse(['ok' => true, 'conv_id' => (int) $conv_id]);
@@ -401,7 +428,7 @@ class ajax_controller
 
 		// Exclude anyone in a block relationship with me (either direction).
 		$blocked_ids = $this->all_block_ids();
-		$exclude = ' AND user_id <> ' . $this->uid;
+		$exclude = ' AND user_id <> ' . (int) $this->uid;
 		if (!empty($blocked_ids))
 		{
 			$exclude .= ' AND ' . $this->db->sql_in_set('user_id', $blocked_ids, true);
@@ -440,7 +467,7 @@ class ajax_controller
 		{
 			$sql = 'UPDATE ' . $this->cu_table . '
 				SET cu_typing_time = ' . time() . '
-				WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . $this->uid;
+				WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 			$this->db->sql_query($sql);
 		}
 
@@ -458,9 +485,9 @@ class ajax_controller
 		$sql = 'SELECT m.conv_id
 			FROM ' . $this->msg_table . ' m, ' . $this->cu_table . ' cu
 			WHERE m.msg_id = ' . (int) $msg_id . '
-				AND m.author_id = ' . $this->uid . '
+				AND m.author_id = ' . (int) $this->uid . '
 				AND cu.conv_id = m.conv_id
-				AND cu.user_id = ' . $this->uid;
+				AND cu.user_id = ' . (int) $this->uid;
 		$result = $this->db->sql_query_limit($sql, 1);
 		$conv_id = (int) $this->db->sql_fetchfield('conv_id');
 		$this->db->sql_freeresult($result);
@@ -489,7 +516,7 @@ class ajax_controller
 		if ($on)
 		{
 			$sql = 'SELECT 1 AS x FROM ' . $this->block_table . '
-				WHERE blocker_id = ' . $this->uid . ' AND blocked_id = ' . (int) $target;
+				WHERE blocker_id = ' . (int) $this->uid . ' AND blocked_id = ' . (int) $target;
 			$result = $this->db->sql_query_limit($sql, 1);
 			$exists = (bool) $this->db->sql_fetchrow($result);
 			$this->db->sql_freeresult($result);
@@ -507,7 +534,7 @@ class ajax_controller
 		else
 		{
 			$sql = 'DELETE FROM ' . $this->block_table . '
-				WHERE blocker_id = ' . $this->uid . ' AND blocked_id = ' . (int) $target;
+				WHERE blocker_id = ' . (int) $this->uid . ' AND blocked_id = ' . (int) $target;
 			$this->db->sql_query($sql);
 		}
 
@@ -521,7 +548,7 @@ class ajax_controller
 		{
 			$sql = 'UPDATE ' . $this->cu_table . '
 				SET cu_hidden = 1
-				WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . $this->uid;
+				WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 			$this->db->sql_query($sql);
 		}
 
@@ -546,7 +573,7 @@ class ajax_controller
 		}
 
 		$sql = 'SELECT 1 AS x FROM ' . $this->cu_table . '
-			WHERE conv_id = ' . $conv_id . ' AND user_id = ' . $this->uid;
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 		$result = $this->db->sql_query_limit($sql, 1);
 		$row = $this->db->sql_fetchrow($result);
 		$this->db->sql_freeresult($result);
@@ -558,14 +585,14 @@ class ajax_controller
 	{
 		$conv_id = (int) $conv_id;
 
-		$sql = 'SELECT MAX(msg_id) AS m FROM ' . $this->msg_table . ' WHERE conv_id = ' . $conv_id;
+		$sql = 'SELECT MAX(msg_id) AS m FROM ' . $this->msg_table . ' WHERE conv_id = ' . (int) $conv_id;
 		$result = $this->db->sql_query($sql);
 		$max = (int) $this->db->sql_fetchfield('m');
 		$this->db->sql_freeresult($result);
 
 		$sql = 'UPDATE ' . $this->cu_table . '
-			SET cu_last_read_id = ' . $max . ', cu_last_read_time = ' . time() . ', cu_unread = 0
-			WHERE conv_id = ' . $conv_id . ' AND user_id = ' . $this->uid;
+			SET cu_last_read_id = ' . (int) $max . ', cu_last_read_time = ' . time() . ', cu_unread = 0
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 		$this->db->sql_query($sql);
 	}
 
@@ -573,7 +600,7 @@ class ajax_controller
 	{
 		$sql = 'SELECT cu_last_read_id, cu_last_read_time, cu_typing_time
 			FROM ' . $this->cu_table . '
-			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . $this->uid;
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . (int) $this->uid;
 		$result = $this->db->sql_query_limit($sql, 1);
 		$row = $this->db->sql_fetchrow($result);
 		$this->db->sql_freeresult($result);
@@ -594,7 +621,7 @@ class ajax_controller
 	protected function partner_id($conv_id)
 	{
 		$sql = 'SELECT user_id FROM ' . $this->cu_table . '
-			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . $this->uid;
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . (int) $this->uid;
 		$result = $this->db->sql_query_limit($sql, 1);
 		$pid = (int) $this->db->sql_fetchfield('user_id');
 		$this->db->sql_freeresult($result);
@@ -613,7 +640,7 @@ class ajax_controller
 		$sql = 'SELECT user_id, username, user_lastvisit,
 				user_avatar, user_avatar_type, user_avatar_width, user_avatar_height
 			FROM ' . USERS_TABLE . '
-			WHERE user_id = ' . $pid;
+			WHERE user_id = ' . (int) $pid;
 		$result = $this->db->sql_query($sql);
 		$u = $this->db->sql_fetchrow($result);
 		$this->db->sql_freeresult($result);
@@ -660,8 +687,8 @@ class ajax_controller
 		}
 
 		$sql = 'SELECT blocker_id, blocked_id FROM ' . $this->block_table . '
-			WHERE (blocker_id = ' . $this->uid . ' AND blocked_id = ' . $other . ')
-				OR (blocker_id = ' . $other . ' AND blocked_id = ' . $this->uid . ')';
+			WHERE (blocker_id = ' . (int) $this->uid . ' AND blocked_id = ' . (int) $other . ')
+				OR (blocker_id = ' . (int) $other . ' AND blocked_id = ' . (int) $this->uid . ')';
 		$result = $this->db->sql_query($sql);
 		while ($row = $this->db->sql_fetchrow($result))
 		{
@@ -683,7 +710,7 @@ class ajax_controller
 	{
 		$ids = [];
 		$sql = 'SELECT blocker_id, blocked_id FROM ' . $this->block_table . '
-			WHERE blocker_id = ' . $this->uid . ' OR blocked_id = ' . $this->uid;
+			WHERE blocker_id = ' . (int) $this->uid . ' OR blocked_id = ' . (int) $this->uid;
 		$result = $this->db->sql_query($sql);
 		while ($row = $this->db->sql_fetchrow($result))
 		{
@@ -739,7 +766,7 @@ class ajax_controller
 		}
 
 		$sql = 'SELECT user_id FROM ' . USERS_TABLE . '
-			WHERE user_id = ' . $other . '
+			WHERE user_id = ' . (int) $other . '
 				AND ' . $this->db->sql_in_set('user_type', [USER_NORMAL, USER_FOUNDER]);
 		$result = $this->db->sql_query($sql);
 		$exists = (int) $this->db->sql_fetchfield('user_id');
@@ -752,8 +779,8 @@ class ajax_controller
 
 		$sql = 'SELECT a.conv_id
 			FROM ' . $this->cu_table . ' a, ' . $this->cu_table . ' b, ' . $this->conv_table . ' c
-			WHERE a.user_id = ' . $this->uid . '
-				AND b.user_id = ' . $other . '
+			WHERE a.user_id = ' . (int) $this->uid . '
+				AND b.user_id = ' . (int) $other . '
 				AND a.conv_id = b.conv_id
 				AND c.conv_id = a.conv_id
 				AND c.conv_type = 0';
