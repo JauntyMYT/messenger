@@ -18,7 +18,7 @@
 		people:lng('people'), typing:lng('typing'), menu:lng('menu'),
 		block:lng('block'), unblock:lng('unblock'), hide:lng('hide'),
 		cdel:lng('cdel'), cblock:lng('cblock'), del:lng('del'),
-		generic:lng('generic')
+		you:lng('you'), generic:lng('generic')
 	};
 
 	var convListEl = document.getElementById('jauntym-convlist');
@@ -43,7 +43,7 @@
 	}
 
 	/* actions that change state: always POST, always with the CSRF token */
-	var WRITE={send:1,start:1,typing:1,delete_message:1,block:1,unblock:1,hide:1};
+	var WRITE={send:1,start:1,typing:1,read:1,delete_message:1,block:1,unblock:1,hide:1};
 
 	function api(action, params, method){
 		params=params||{};
@@ -70,7 +70,7 @@
 		var html='';
 		for (var i=0;i<list.length;i++){
 			var c=list[i];
-			var snip=(c.snippet_mine?'<span style="color:#999">You: </span>':'')+esc(c.snippet);
+			var snip=(c.snippet_mine?'<span style="color:#999">'+esc(LANG.you)+' </span>':'')+esc(c.snippet);
 			html+='<div class="jauntym-conv'+(c.conv_id===current.convId?' jauntym-active':'')+(c.unread>0?' jauntym-unread':'')+'" data-conv="'+c.conv_id+'">'
 				+avatar(c.avatar,c.name,false)
 				+'<div class="jauntym-meta"><div class="jauntym-row1"><span class="jauntym-name">'+esc(c.name)+'</span><span class="jauntym-time">'+esc(c.time)+'</span></div>'
@@ -103,8 +103,14 @@
 			current.partner=res.partner; current.lastReadId=res.partner_read_id||0; current.readTime=res.partner_read_time||''; current.typing=!!res.partner_typing;
 			renderHead(res.partner);
 			if(before){ prependMessages(res.messages,res.has_more); }
-			else { renderThread(res.messages,res.has_more,scrollBottom); }
+			else { renderThread(res.messages,res.has_more,scrollBottom); markRead(res); }
 		});
+	}
+
+	/* 'messages' is read-only: once unread messages are on screen, mark them read with a POST */
+	function markRead(res){
+		if(!res || !(res.unread>0) || document.visibilityState==='hidden'){ return; }
+		api('read',{conv_id:res.conv_id}).then(function(){ loadConversations(); });
 	}
 
 	function renderHead(p){
@@ -264,6 +270,7 @@
 				var existing=threadEl.querySelectorAll('.jauntym-line').length;
 				if(res.messages.length!==existing){ renderThread(res.messages,res.has_more,atBottom); }
 				else { applyReceipt(); }
+				markRead(res);
 			});
 		}
 		loadConversations();

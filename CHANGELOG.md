@@ -4,6 +4,37 @@ All notable changes to JauntyM Messenger are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.7
+
+### Privacy
+- Online status and "last seen" now follow phpBB core rules (`phpbb_show_profile()`):
+  a member who enables "Hide my online status", or hides it for a single session at
+  login, is shown as offline with no last-seen time unless the viewer has the
+  `u_viewonline` permission. Nobody is shown as online when the board's online tracking
+  is switched off. Previously the sessions table was read directly, bypassing the
+  member's setting.
+- Blocking now hides presence in both directions: between two members where either has
+  blocked the other, online status, read receipts and typing indicators are no longer
+  shown, and typing pings are not recorded.
+
+### Changed
+- "You:" (conversation list) and "99+" (unread badge) are now language strings, so they
+  can be translated.
+- All templates now use Twig syntax throughout (`{{ VAR }}`, `{{ lang('KEY') }}`).
+- Opening a conversation no longer marks it read as a side effect of a GET request. The
+  client sends a separate POST `read` action, protected like every other write, once
+  unread messages are on screen and the tab is visible.
+- The conversation list is built from a fixed number of queries instead of several per
+  conversation, which matters because it is polled.
+- Starting a conversation with yourself now reports "You cannot message yourself."
+- Removed the unused `JAUNTYM_M_DELIVERED` language string.
+
+### Fixed
+- Two simultaneous requests could create two direct conversations for the same pair of
+  members. Conversations now carry a canonical `conv_key` with a unique index, and
+  creation runs in a transaction that falls back to the existing conversation if a
+  concurrent request wins. The upgrade merges any duplicates already on the board.
+
 ## 1.3.6
 
 ### Security

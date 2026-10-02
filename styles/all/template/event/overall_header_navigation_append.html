@@ -1,7 +1,7 @@
 {% if S_JAUNTYM_MESSENGER %}
 <li data-skip-responsive="false">
-	<a href="{U_JAUNTYM_MESSENGER}" title="{L_JAUNTYM_MESSENGER}" role="menuitem">
-		<i class="icon fa-comments-o fa-fw" aria-hidden="true"></i><span>{L_JAUNTYM_MESSENGER}</span>
+	<a href="{{ U_JAUNTYM_MESSENGER }}" title="{{ lang('JAUNTYM_MESSENGER') }}" role="menuitem">
+		<i class="icon fa-comments-o fa-fw" aria-hidden="true"></i><span>{{ lang('JAUNTYM_MESSENGER') }}</span>
 		{% if JAUNTYM_MESSENGER_UNREAD %}<strong class="jauntym-nav-badge">{{ JAUNTYM_MESSENGER_UNREAD }}</strong>{% endif %}
 	</a>
 </li>

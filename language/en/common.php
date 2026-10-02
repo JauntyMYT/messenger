@@ -28,7 +28,6 @@ $lang = array_merge($lang, [
 	'JAUNTYM_M_PICK_CONVERSATION'       => 'Select a conversation to start chatting.',
 	'JAUNTYM_M_SEEN'                    => 'Seen',
 	'JAUNTYM_M_SENT'                    => 'Sent',
-	'JAUNTYM_M_DELIVERED'               => 'Delivered',
 	'JAUNTYM_M_ONLINE'                  => 'Online',
 	'JAUNTYM_M_LAST_SEEN'               => 'Last seen %s',
 	'JAUNTYM_M_LOAD_OLDER'              => 'Load older messages',
@@ -45,6 +44,8 @@ $lang = array_merge($lang, [
 	'JAUNTYM_M_UNBLOCK'                 => 'Unblock user',
 	'JAUNTYM_M_HIDE_CONV'               => 'Hide conversation',
 	'JAUNTYM_M_CONFIRM_BLOCK'           => 'Block this member? You will no longer be able to message each other.',
+	'JAUNTYM_M_YOU'                     => 'You:',
+	'JAUNTYM_M_BADGE_MAX'               => '99+',
 
 	// AJAX / error strings
 	'JAUNTYM_M_ERR_AUTH'                => 'You are not allowed to use the messenger.',

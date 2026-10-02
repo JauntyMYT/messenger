@@ -9,7 +9,7 @@
 	var ME=parseInt(dock.getAttribute('data-me'),10)||0, CANDM=dock.getAttribute('data-candm')==='1';
 
 	function lng(k){return dock.getAttribute('data-l-'+k)||'';}
-	var LNONE=lng('none'), LOPEN=lng('openfull'), LRECIP=lng('recipient'), LDM=lng('dm');
+	var LNONE=lng('none'), LOPEN=lng('openfull'), LRECIP=lng('recipient'), LDM=lng('dm'), LYOU=lng('you'), LMAX=lng('max');
 
 	var body=document.getElementById('jauntymbd-body');
 	var compose=document.getElementById('jauntymbd-compose');
@@ -29,7 +29,7 @@
 		return '<span class="jauntymbd-av" style="background:hsl('+h+',42%,55%)">'+esc(initials(name))+'</span>';
 	}
 	/* actions that change state: always POST, always with the CSRF token */
-	var WRITE={send:1,start:1,typing:1,delete_message:1,block:1,unblock:1,hide:1};
+	var WRITE={send:1,start:1,typing:1,read:1,delete_message:1,block:1,unblock:1,hide:1};
 
 	function api(action,params,method){
 		params=params||{};
@@ -44,7 +44,7 @@
 	}
 	function setBadge(n){
 		if(!fabBadge){return;}
-		if(n>0){fabBadge.textContent=n>99?'99+':n;fabBadge.style.display='';}
+		if(n>0){fabBadge.textContent=n>99?LMAX:n;fabBadge.style.display='';}
 		else{fabBadge.style.display='none';}
 	}
 
@@ -60,7 +60,7 @@
 				html+='<div class="jauntymbd-item'+(c.unread>0?' unread':'')+'" data-conv="'+c.conv_id+'">'
 					+av(c.avatar,c.name)
 					+'<div class="jauntymbd-meta"><div class="jauntymbd-name">'+esc(c.name)+'</div>'
-					+'<div class="jauntymbd-snip">'+(c.snippet_mine?'You: ':'')+esc(c.snippet)+'</div></div>'
+					+'<div class="jauntymbd-snip">'+(c.snippet_mine?esc(LYOU)+' ':'')+esc(c.snippet)+'</div></div>'
 					+'<span class="jauntymbd-time">'+esc(c.time)+'</span>'
 					+(c.unread>0?'<span class="jauntymbd-dot"></span>':'')
 					+'</div>';
@@ -94,6 +94,8 @@
 				if(e.target.tagName==='A'){return;}
 				showList();
 			});
+			/* 'messages' is read-only: mark unread messages read once they are on screen */
+			if(res.unread>0&&document.visibilityState!=='hidden'){api('read',{conv_id:id});}
 		});
 	}
 

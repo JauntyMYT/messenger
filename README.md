@@ -21,7 +21,8 @@ phpBB's native private-message inbox.
 - **Typing indicators** (polling-based)
 - **BBCode + smilies** in messages, rendered through phpBB's own text engine
 - **Soft-delete** your own messages
-- **Block / unblock** members (blocks both directions and hides them from search)
+- **Block / unblock** members — works in both directions: no messages, no online status,
+  read receipts or typing indicators, and blocked members are hidden from search
 - **Hide conversation** from your list
 - **Floating chat bubble** in the bottom-right of every page, with a mini conversation
   list, mini chat, and member search
@@ -63,9 +64,13 @@ requires a persistent server process that typical shared hosting cannot run.
 
 - Message bodies are processed by phpBB's text engine (`generate_text_for_display`),
   which handles escaping, BBCode, smilies, and censor words.
-- Sending and deleting are protected by phpBB CSRF link hashes and ACL checks.
+- Every action that changes data is POST-only and protected by a phpBB CSRF link hash,
+  plus ACL checks.
 - Conversation membership and block state are verified server-side on every action.
 - Member search excludes anyone in a block relationship with you.
+- Online status and "last seen" follow phpBB core rules: members who hide their online
+  status are shown as offline unless the viewer has the "Can view hidden online users"
+  permission, and no one is shown as online when the board has online tracking switched off.
 
 ## Support
 

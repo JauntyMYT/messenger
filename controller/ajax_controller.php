@@ -40,13 +40,13 @@ class ajax_controller
 
 	const PAGE_SIZE   = 30;
 	const TYPING_WINDOW = 8;
-	const VERSION = '1.3.6';
+	const VERSION = '1.3.7';
 
 	/**
 	 * Actions that write to the database. Each one must arrive as a POST carrying a
 	 * valid link hash, so it cannot be triggered by a cross-site request.
 	 */
-	protected static $write_actions = ['send', 'start', 'typing', 'delete_message', 'block', 'unblock', 'hide'];
+	protected static $write_actions = ['send', 'start', 'typing', 'read', 'delete_message', 'block', 'unblock', 'hide'];
 
 	public function __construct(config $config, driver_interface $db, request_interface $request, user $user, language $language, auth $auth, $table_prefix, $root_path, $php_ext)
 	{
@@ -123,6 +123,7 @@ class ajax_controller
 				case 'start':          return $this->start_conversation();
 				case 'search_users':   return $this->search_users();
 				case 'typing':         return $this->set_typing();
+				case 'read':           return $this->read_conversation();
 				case 'delete_message': return $this->delete_message();
 				case 'block':          return $this->block(true);
 				case 'unblock':        return $this->block(false);
@@ -156,6 +157,10 @@ class ajax_controller
 	 *  Endpoints
 	 * ----------------------------------------------------------------- */
 
+	/**
+	 * The conversation list is polled, so it is built from a fixed number of
+	 * queries however many conversations the member has.
+	 */
 	protected function list_conversations()
 	{
 		$sql = 'SELECT c.conv_id, c.conv_last_time, c.conv_last_msg_id, cu.cu_unread
@@ -173,22 +178,59 @@ class ajax_controller
 		}
 		$this->db->sql_freeresult($result);
 
+		if (empty($rows))
+		{
+			return new JsonResponse(['ok' => true, 'conversations' => []]);
+		}
+
+		$sql = 'SELECT conv_id, user_id
+			FROM ' . $this->cu_table . '
+			WHERE ' . $this->db->sql_in_set('conv_id', array_keys($rows)) . '
+				AND user_id <> ' . (int) $this->uid;
+		$result = $this->db->sql_query($sql);
+
+		$partner_of = [];
+		while ($row = $this->db->sql_fetchrow($result))
+		{
+			$partner_of[(int) $row['conv_id']] = (int) $row['user_id'];
+		}
+		$this->db->sql_freeresult($result);
+
+		$partner_ids = array_values(array_unique($partner_of));
+		$users       = $this->load_users($partner_ids);
+		$sessions    = $this->load_sessions($partner_ids);
+		$blocked     = array_flip($this->all_block_ids());
+
+		$last_ids = [];
+		foreach ($rows as $row)
+		{
+			if ((int) $row['conv_last_msg_id'] > 0)
+			{
+				$last_ids[] = (int) $row['conv_last_msg_id'];
+			}
+		}
+		$snippets = $this->load_snippets($last_ids);
+
 		$out = [];
 		foreach ($rows as $conv_id => $row)
 		{
-			$partner = $this->get_partner($conv_id);
-			if (!$partner)
+			$pid = isset($partner_of[$conv_id]) ? $partner_of[$conv_id] : 0;
+			if (!$pid || !isset($users[$pid]))
 			{
 				continue;
 			}
-			$last = $this->last_message_snippet((int) $row['conv_last_msg_id']);
+
+			$u        = $users[$pid];
+			$presence = $this->presence($u, isset($sessions[$pid]) ? $sessions[$pid] : null, isset($blocked[$pid]));
+			$last_id  = (int) $row['conv_last_msg_id'];
+			$last     = isset($snippets[$last_id]) ? $snippets[$last_id] : ['text' => '', 'mine' => false];
 
 			$out[] = [
 				'conv_id'      => $conv_id,
-				'user_id'      => (int) $partner['user_id'],
-				'name'         => $partner['name'],
-				'avatar'       => $partner['avatar'],
-				'online'       => $partner['online'],
+				'user_id'      => $pid,
+				'name'         => $u['username'],
+				'avatar'       => function_exists('phpbb_get_user_avatar') ? phpbb_get_user_avatar($u) : '',
+				'online'       => $presence['online'],
 				'snippet'      => $last['text'],
 				'snippet_mine' => $last['mine'],
 				'time'         => $row['conv_last_time'] ? $this->user->format_date((int) $row['conv_last_time']) : '',
@@ -199,12 +241,17 @@ class ajax_controller
 		return new JsonResponse(['ok' => true, 'conversations' => $out]);
 	}
 
+	/**
+	 * Read-only: returns a page of messages. Marking the conversation read is a
+	 * separate POST ('read'), which the client sends once it has shown the messages.
+	 */
 	protected function get_messages()
 	{
 		$conv_id = $this->request->variable('conv_id', 0);
 		$before  = $this->request->variable('before', 0);
 
-		if (!$this->is_member($conv_id))
+		$member = $this->member_row($conv_id);
+		if (!$member)
 		{
 			return $this->error('JAUNTYM_M_ERR_NOT_MEMBER', 403);
 		}
@@ -249,20 +296,18 @@ class ajax_controller
 			];
 		}
 
-		if ($before === 0)
-		{
-			$this->mark_read($conv_id);
-		}
-
-		$partner = $this->get_partner($conv_id);
-		$state   = $this->partner_state($conv_id);
+		$pid     = $this->partner_id($conv_id);
+		$block   = $this->block_state($pid);
+		$blocked = $block['i_blocked'] || $block['blocked_me'];
+		$state   = $this->partner_state($conv_id, $blocked);
 
 		return new JsonResponse([
 			'ok'                => true,
 			'conv_id'           => (int) $conv_id,
 			'messages'          => $messages,
 			'has_more'          => $has_more,
-			'partner'           => $partner,
+			'unread'            => (int) $member['cu_unread'],
+			'partner'           => $this->build_partner($pid, $block),
 			'partner_read_id'   => $state['read_id'],
 			'partner_read_time' => $state['read_time'],
 			'partner_typing'    => $state['typing'],
@@ -292,6 +337,11 @@ class ajax_controller
 
 		if ($conv_id === 0 && $to_user > 0)
 		{
+			if ($to_user === $this->uid)
+			{
+				return $this->error('JAUNTYM_M_ERR_SELF', 400);
+			}
+
 			$block = $this->block_state($to_user);
 			if ($block['i_blocked'])
 			{
@@ -383,6 +433,10 @@ class ajax_controller
 		}
 
 		$to_user = $this->request->variable('user_id', 0);
+		if ($to_user === $this->uid)
+		{
+			return $this->error('JAUNTYM_M_ERR_SELF', 400);
+		}
 
 		$block = $this->block_state($to_user);
 		if ($block['i_blocked'])
@@ -463,13 +517,35 @@ class ajax_controller
 		}
 
 		$conv_id = $this->request->variable('conv_id', 0);
-		if ($this->is_member($conv_id))
+		if (!$this->is_member($conv_id))
 		{
-			$sql = 'UPDATE ' . $this->cu_table . '
-				SET cu_typing_time = ' . time() . '
-				WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
-			$this->db->sql_query($sql);
+			return new JsonResponse(['ok' => true]);
 		}
+
+		// Blocking works in both directions: neither side's typing is recorded.
+		$block = $this->block_state($this->partner_id($conv_id));
+		if ($block['i_blocked'] || $block['blocked_me'])
+		{
+			return new JsonResponse(['ok' => true]);
+		}
+
+		$sql = 'UPDATE ' . $this->cu_table . '
+			SET cu_typing_time = ' . (int) time() . '
+			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
+		$this->db->sql_query($sql);
+
+		return new JsonResponse(['ok' => true]);
+	}
+
+	protected function read_conversation()
+	{
+		$conv_id = $this->request->variable('conv_id', 0);
+		if (!$this->is_member($conv_id))
+		{
+			return $this->error('JAUNTYM_M_ERR_NOT_MEMBER', 403);
+		}
+
+		$this->mark_read($conv_id);
 
 		return new JsonResponse(['ok' => true]);
 	}
@@ -498,8 +574,8 @@ class ajax_controller
 		}
 
 		$sql = 'UPDATE ' . $this->msg_table . '
-			SET msg_deleted = ' . time() . "
-			WHERE msg_id = " . (int) $msg_id;
+			SET msg_deleted = ' . (int) time() . '
+			WHERE msg_id = ' . (int) $msg_id;
 		$this->db->sql_query($sql);
 
 		return new JsonResponse(['ok' => true]);
@@ -566,19 +642,27 @@ class ajax_controller
 
 	protected function is_member($conv_id)
 	{
+		return (bool) $this->member_row($conv_id);
+	}
+
+	/**
+	 * The current member's row in a conversation, or null if they are not in it.
+	 */
+	protected function member_row($conv_id)
+	{
 		$conv_id = (int) $conv_id;
 		if ($conv_id <= 0)
 		{
-			return false;
+			return null;
 		}
 
-		$sql = 'SELECT 1 AS x FROM ' . $this->cu_table . '
+		$sql = 'SELECT cu_unread FROM ' . $this->cu_table . '
 			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 		$result = $this->db->sql_query_limit($sql, 1);
 		$row = $this->db->sql_fetchrow($result);
 		$this->db->sql_freeresult($result);
 
-		return (bool) $row;
+		return $row ?: null;
 	}
 
 	protected function mark_read($conv_id)
@@ -591,13 +675,23 @@ class ajax_controller
 		$this->db->sql_freeresult($result);
 
 		$sql = 'UPDATE ' . $this->cu_table . '
-			SET cu_last_read_id = ' . (int) $max . ', cu_last_read_time = ' . time() . ', cu_unread = 0
+			SET cu_last_read_id = ' . (int) $max . ', cu_last_read_time = ' . (int) time() . ', cu_unread = 0
 			WHERE conv_id = ' . (int) $conv_id . ' AND user_id = ' . (int) $this->uid;
 		$this->db->sql_query($sql);
 	}
 
-	protected function partner_state($conv_id)
+	/**
+	 * Read receipt and typing state of the other member. When either side has
+	 * blocked the other, a neutral state is returned instead.
+	 */
+	protected function partner_state($conv_id, $blocked)
 	{
+		$state = ['read_id' => 0, 'read_time' => '', 'typing' => false];
+		if ($blocked)
+		{
+			return $state;
+		}
+
 		$sql = 'SELECT cu_last_read_id, cu_last_read_time, cu_typing_time
 			FROM ' . $this->cu_table . '
 			WHERE conv_id = ' . (int) $conv_id . ' AND user_id <> ' . (int) $this->uid;
@@ -605,17 +699,19 @@ class ajax_controller
 		$row = $this->db->sql_fetchrow($result);
 		$this->db->sql_freeresult($result);
 
-		$typing = false;
-		if (!empty($this->config['jauntym_msgr_typing']) && $row)
+		if (!$row)
 		{
-			$typing = ((int) $row['cu_typing_time'] > (time() - self::TYPING_WINDOW));
+			return $state;
 		}
 
-		return [
-			'read_id'   => $row ? (int) $row['cu_last_read_id'] : 0,
-			'read_time' => ($row && $row['cu_last_read_time']) ? $this->user->format_date((int) $row['cu_last_read_time']) : '',
-			'typing'    => $typing,
-		];
+		$state['read_id']   = (int) $row['cu_last_read_id'];
+		$state['read_time'] = $row['cu_last_read_time'] ? $this->user->format_date((int) $row['cu_last_read_time']) : '';
+		if (!empty($this->config['jauntym_msgr_typing']))
+		{
+			$state['typing'] = ((int) $row['cu_typing_time'] > (time() - self::TYPING_WINDOW));
+		}
+
+		return $state;
 	}
 
 	protected function partner_id($conv_id)
@@ -629,52 +725,123 @@ class ajax_controller
 		return $pid;
 	}
 
-	protected function get_partner($conv_id)
+	protected function build_partner($pid, array $block)
 	{
-		$pid = $this->partner_id($conv_id);
 		if (!$pid)
 		{
 			return null;
 		}
 
-		$sql = 'SELECT user_id, username, user_lastvisit,
-				user_avatar, user_avatar_type, user_avatar_width, user_avatar_height
-			FROM ' . USERS_TABLE . '
-			WHERE user_id = ' . (int) $pid;
-		$result = $this->db->sql_query($sql);
-		$u = $this->db->sql_fetchrow($result);
-		$this->db->sql_freeresult($result);
-
-		if (!$u)
+		$users = $this->load_users([$pid]);
+		if (!isset($users[$pid]))
 		{
 			return null;
 		}
 
-		$block = $this->block_state($pid);
+		$u        = $users[$pid];
+		$sessions = $this->load_sessions([$pid]);
+		$presence = $this->presence($u, isset($sessions[$pid]) ? $sessions[$pid] : null, $block['i_blocked'] || $block['blocked_me']);
 
 		return [
-			'user_id'   => $pid,
+			'user_id'   => (int) $pid,
 			'name'      => $u['username'],
 			'avatar'    => function_exists('phpbb_get_user_avatar') ? phpbb_get_user_avatar($u) : '',
-			'online'    => $this->is_online($pid),
-			'last_seen' => $u['user_lastvisit']
-				? $this->language->lang('JAUNTYM_M_LAST_SEEN', $this->user->format_date((int) $u['user_lastvisit']))
-				: '',
+			'online'    => $presence['online'],
+			'last_seen' => $presence['last_seen'],
 			'i_blocked' => $block['i_blocked'],
 		];
 	}
 
-	protected function is_online($user_id)
+	/**
+	 * User rows keyed by user_id, with the columns needed for display and presence.
+	 */
+	protected function load_users(array $user_ids)
 	{
-		$window = time() - ((int) $this->config['load_online_time'] * 60);
+		if (empty($user_ids))
+		{
+			return [];
+		}
 
-		$sql = 'SELECT MAX(session_time) AS t FROM ' . SESSIONS_TABLE . '
-			WHERE session_user_id = ' . (int) $user_id;
+		// user_last_active only exists from phpBB 3.3.12.
+		$last_active = phpbb_version_compare($this->config['version'], '3.3.12', '>=') ? ', user_last_active' : '';
+
+		$sql = 'SELECT user_id, username, user_lastvisit, user_allow_viewonline' . $last_active . ',
+				user_avatar, user_avatar_type, user_avatar_width, user_avatar_height
+			FROM ' . USERS_TABLE . '
+			WHERE ' . $this->db->sql_in_set('user_id', array_map('intval', $user_ids));
 		$result = $this->db->sql_query($sql);
-		$t = (int) $this->db->sql_fetchfield('t');
+
+		$users = [];
+		while ($row = $this->db->sql_fetchrow($result))
+		{
+			$users[(int) $row['user_id']] = $row;
+		}
 		$this->db->sql_freeresult($result);
 
-		return $t > $window;
+		return $users;
+	}
+
+	/**
+	 * Latest session time per user, and whether every session is visible. Mirrors
+	 * memberlist.php: MIN(session_viewonline) means one hidden session hides them.
+	 */
+	protected function load_sessions(array $user_ids)
+	{
+		if (empty($user_ids))
+		{
+			return [];
+		}
+
+		$sql = 'SELECT session_user_id, MAX(session_time) AS session_time, MIN(session_viewonline) AS session_viewonline
+			FROM ' . SESSIONS_TABLE . '
+			WHERE ' . $this->db->sql_in_set('session_user_id', array_map('intval', $user_ids)) . '
+			GROUP BY session_user_id';
+		$result = $this->db->sql_query($sql);
+
+		$sessions = [];
+		while ($row = $this->db->sql_fetchrow($result))
+		{
+			$sessions[(int) $row['session_user_id']] = $row;
+		}
+		$this->db->sql_freeresult($result);
+
+		return $sessions;
+	}
+
+	/**
+	 * Online flag and "last seen" text, applying the same rules as the profile page
+	 * (phpbb_show_profile()): a member who hides their online status is shown as
+	 * offline with no last-seen time, unless the viewer has u_viewonline. Nothing is
+	 * shown between members where either has blocked the other.
+	 */
+	protected function presence(array $u, $session, $blocked)
+	{
+		$presence = ['online' => false, 'last_seen' => ''];
+		if ($blocked)
+		{
+			return $presence;
+		}
+
+		$can_view_hidden = $this->auth->acl_get('u_viewonline');
+		$session_time    = $session ? (int) $session['session_time'] : 0;
+
+		if (!empty($this->config['load_onlinetrack']) && $session)
+		{
+			$window = (int) $this->config['load_online_time'] * 60;
+			$presence['online'] = (time() - $window < $session_time)
+				&& (!empty($session['session_viewonline']) || $can_view_hidden);
+		}
+
+		if (!empty($u['user_allow_viewonline']) || $can_view_hidden)
+		{
+			$last = !empty($u['user_last_active']) ? (int) $u['user_last_active'] : ($session_time ?: (int) $u['user_lastvisit']);
+			if ($last)
+			{
+				$presence['last_seen'] = $this->language->lang('JAUNTYM_M_LAST_SEEN', $this->user->format_date($last));
+			}
+		}
+
+		return $presence;
 	}
 
 	protected function block_state($other)
@@ -722,24 +889,33 @@ class ajax_controller
 		return array_values($ids);
 	}
 
-	protected function last_message_snippet($msg_id)
+	/**
+	 * Plain-text previews of the given messages, keyed by msg_id.
+	 */
+	protected function load_snippets(array $msg_ids)
 	{
-		if ($msg_id <= 0)
+		if (empty($msg_ids))
 		{
-			return ['text' => '', 'mine' => false];
+			return [];
 		}
 
-		$sql = 'SELECT author_id, msg_text, bbcode_uid, bbcode_bitfield, bbcode_options, msg_deleted
-			FROM ' . $this->msg_table . ' WHERE msg_id = ' . (int) $msg_id;
+		$sql = 'SELECT msg_id, author_id, msg_text, bbcode_uid, bbcode_bitfield, bbcode_options, msg_deleted
+			FROM ' . $this->msg_table . '
+			WHERE ' . $this->db->sql_in_set('msg_id', array_map('intval', $msg_ids));
 		$result = $this->db->sql_query($sql);
-		$row = $this->db->sql_fetchrow($result);
+
+		$snippets = [];
+		while ($row = $this->db->sql_fetchrow($result))
+		{
+			$snippets[(int) $row['msg_id']] = $this->format_snippet($row);
+		}
 		$this->db->sql_freeresult($result);
 
-		if (!$row)
-		{
-			return ['text' => '', 'mine' => false];
-		}
+		return $snippets;
+	}
 
+	protected function format_snippet(array $row)
+	{
 		$mine = ((int) $row['author_id'] === $this->uid);
 
 		if ((int) $row['msg_deleted'] > 0)
@@ -755,6 +931,29 @@ class ajax_controller
 		}
 
 		return ['text' => $plain, 'mine' => $mine];
+	}
+
+	/**
+	 * Canonical key for the direct conversation between two members. The column
+	 * carries a unique index, so a pair can only ever have one direct conversation.
+	 */
+	protected function direct_key($a, $b)
+	{
+		$a = (int) $a;
+		$b = (int) $b;
+
+		return min($a, $b) . '_' . max($a, $b);
+	}
+
+	protected function find_direct($key)
+	{
+		$sql = 'SELECT conv_id FROM ' . $this->conv_table . "
+			WHERE conv_key = '" . $this->db->sql_escape($key) . "'";
+		$result = $this->db->sql_query_limit($sql, 1);
+		$conv_id = (int) $this->db->sql_fetchfield('conv_id');
+		$this->db->sql_freeresult($result);
+
+		return $conv_id;
 	}
 
 	protected function find_or_create_direct($other)
@@ -777,36 +976,41 @@ class ajax_controller
 			return 0;
 		}
 
-		$sql = 'SELECT a.conv_id
-			FROM ' . $this->cu_table . ' a, ' . $this->cu_table . ' b, ' . $this->conv_table . ' c
-			WHERE a.user_id = ' . (int) $this->uid . '
-				AND b.user_id = ' . (int) $other . '
-				AND a.conv_id = b.conv_id
-				AND c.conv_id = a.conv_id
-				AND c.conv_type = 0';
-		$result = $this->db->sql_query_limit($sql, 1);
-		$found = (int) $this->db->sql_fetchfield('conv_id');
-		$this->db->sql_freeresult($result);
-
+		$key   = $this->direct_key($this->uid, $other);
+		$found = $this->find_direct($key);
 		if ($found)
 		{
 			return $found;
 		}
 
 		$now = time();
-		$sql = 'INSERT INTO ' . $this->conv_table . ' ' . $this->db->sql_build_array('INSERT', [
+		$this->db->sql_transaction('begin');
+
+		$this->db->sql_return_on_error(true);
+		$inserted = $this->db->sql_query('INSERT INTO ' . $this->conv_table . ' ' . $this->db->sql_build_array('INSERT', [
 			'conv_type'      => 0,
 			'conv_title'     => '',
+			'conv_key'       => $key,
 			'conv_created'   => $now,
 			'conv_last_time' => $now,
-		]);
-		$this->db->sql_query($sql);
+		]));
+		$this->db->sql_return_on_error(false);
+
+		if (!$inserted)
+		{
+			// A concurrent request created this pair's conversation first and the
+			// unique index rejected ours (phpBB has already rolled back). Use theirs.
+			return $this->find_direct($key);
+		}
+
 		$conv_id = (int) $this->db->sql_nextid();
 
 		$this->db->sql_multi_insert($this->cu_table, [
 			['conv_id' => $conv_id, 'user_id' => $this->uid, 'cu_joined' => $now, 'cu_hidden' => 0],
 			['conv_id' => $conv_id, 'user_id' => $other,     'cu_joined' => $now, 'cu_hidden' => 0],
 		]);
+
+		$this->db->sql_transaction('commit');
 
 		return $conv_id;
 	}
